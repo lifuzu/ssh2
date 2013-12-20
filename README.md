@@ -1,4 +1,3 @@
-
 Description
 ===========
 
@@ -28,9 +27,6 @@ Examples
 var Connection = require('ssh2');
 
 var c = new Connection();
-c.on('connect', function() {
-  console.log('Connection :: connect');
-});
 c.on('ready', function() {
   console.log('Connection :: ready');
   c.exec('uptime', function(err, stream) {
@@ -83,9 +79,6 @@ c.connect({
 var Connection = require('ssh2');
 
 var c = new Connection();
-c.on('connect', function() {
-  console.log('Connection :: connect');
-});
 c.on('ready', function() {
   console.log('Connection :: ready');
   c.forwardOut('192.168.100.102', 8000, '127.0.0.1', 80, function(err, stream) {
@@ -143,8 +136,8 @@ c.connect({
 // Vary: Accept-Encoding
 // Connection: close
 // Content-Type: text/html; charset=UTF-8
-// 
-// 
+//
+//
 // TCP :: EOF
 // TCP :: CLOSED
 // Connection :: end
@@ -157,9 +150,6 @@ c.connect({
 var Connection = require('ssh2');
 
 var c = new Connection();
-c.on('connect', function() {
-  console.log('Connection :: connect');
-});
 c.on('tcp connection', function(info, accept, reject) {
   console.log('TCP :: INCOMING CONNECTION: ' + require('util').inspect(info));
 
@@ -235,9 +225,6 @@ c.connect({
 var Connection = require('ssh2');
 
 var c = new Connection();
-c.on('connect', function() {
-  console.log('Connection :: connect');
-});
 c.on('ready', function() {
   console.log('Connection :: ready');
   c.sftp(function(err, sftp) {
@@ -322,6 +309,47 @@ c.connect({
 // SFTP :: SFTP session closed
 ```
 
+* Invoke an arbitrary subsystem (netconf in this example):
+
+```javascript
+var Connection = require('ssh'),
+    xmlhello = '<?xml version="1.0" encoding="UTF-8"?>'+
+               '<hello xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">'+
+               '    <capabilities>'+
+               '		<capability>urn:ietf:params:netconf:base:1.0</capability>'+
+               '	</capabilities>'+
+               '</hello>]]>]]>';
+
+var c = new Connection();
+
+c.on('ready', function() {
+  console.log('Connection :: ready');
+  c.subsys('netconf', function(err, stream) {
+    stream.on('data', function(data, extended) {
+      console.log(data);
+      // would probably want to parse xml2js here
+    });
+    stream.write(xmlhello);
+  });
+});
+
+c.on('error', function(err) {
+  console.log('Connection :: error :: ' + err);
+});
+c.on('end', function() {
+  console.log('Connection :: end');
+});
+c.on('close', function(had_error) {
+  console.log('Connection :: close');
+});
+
+c.connect({
+  host: '1.2.3.4',
+  port: 22,
+  username: 'blargh',
+  password: 'honk'
+});
+```
 
 API
 ===
@@ -330,8 +358,6 @@ API
 
 Connection events
 -----------------
-
-* **connect**() - A connection to the server was successful.
 
 * **banner**(< _string_ >message, < _string_ >language) - A notice was sent by the server upon connection.
 
@@ -356,6 +382,8 @@ Connection events
 * **end**() - The socket was disconnected.
 
 * **close**(< _boolean_ >hadError) - The socket was closed. `hadError` is set to true if this was due to error.
+
+* **debug**(< _string_ >message) - If `debug` is set in the object passed to connect(), then this event will be emitted when the server sends debug messages. For OpenSSH, these usually are messages like "Pty allocation disabled.", "X11 forwarding disabled.", etc. when options are set for particular keys in `~/.ssh/authorized_keys`.
 
 
 Connection methods
@@ -382,7 +410,7 @@ Connection methods
     * **privateKey** - < _mixed_ > - Buffer or string that contains a private key for key-based user authentication (OpenSSH format). **Default:** (none)
 
     * **passphrase** - < _string_ > - For an encrypted private key, this is the passphrase used to decrypt it. **Default:** (none)
-    
+
     * **publicKey** - < _mixed_ > - Optional Buffer or string that contains a public key for key-based user authentication (OpenSSH format). If `publicKey` is not set, it will be generated from the `privateKey`. **Default:** (none)
 
     * **tryKeyboard** - < _boolean_ > - Try keyboard-interactive user authentication if primary user authentication method fails. **Default:** false
@@ -397,7 +425,7 @@ Connection methods
 
     * **env** - < _object_ > - An environment to use for the execution of the command.
 
-    * **pty** - < _mixed_ > - Set to true to allocate a pseudo-tty with defaults, or an object containing specific pseudo-tty settings (see 'Pseudo-TTY settings').
+    * **pty** - < _mixed_ > - Set to true to allocate a pseudo-tty with defaults, or an object containing specific pseudo-tty settings (see 'Pseudo-TTY settings'). Setting up a pseudo-tty can be useful when working with remote processes that expect input from an actual terminal (e.g. sudo's password prompt).
 
     `callback` has 2 parameters: < _Error_ >err, < _ChannelStream_ >stream.
 
@@ -421,6 +449,8 @@ Connection methods
 
 * **sftp**(< _function_ >callback) - _(void)_ - Starts an SFTP (protocol version 3) session. `callback` has 2 parameters: < _Error_ >err, < _SFTP_ >sftpConnection.
 
+* **subsys**(< _string_ >subsystem, < _function_ >callback) - _(void)_ - Invokes `subsystem` on the server. `callback` has 2 parameters: < _Error_ >err, < _ChannelStream_ >stream.
+
 * **end**() - _(void)_ - Disconnects the socket.
 
 
@@ -443,7 +473,7 @@ This is a normal duplex Stream, with the following changes:
 
     * 'data' events are passed a second (string) argument to the callback, which indicates whether the data is a special type. So far the only defined type is 'stderr'.
 
-    * **signal**(< _string_ >signalName) - _(void)_ - Sends a POSIX signal to the current process on the server. Valid signal names are: 'ABRT', 'ALRM', 'FPE', 'HUP', 'ILL', 'INT', 'KILL', 'PIPE', 'QUIT', 'SEGV', 'TERM', 'USR1', and 'USR2'. Also, from the RFC: "Some systems may not implement signals, in which case they SHOULD ignore this message."
+    * **signal**(< _string_ >signalName) - _(void)_ - Sends a POSIX signal to the current process on the server. Valid signal names are: 'ABRT', 'ALRM', 'FPE', 'HUP', 'ILL', 'INT', 'KILL', 'PIPE', 'QUIT', 'SEGV', 'TERM', 'USR1', and 'USR2'. Also, from the RFC: "Some systems may not implement signals, in which case they SHOULD ignore this message." Note: If you are trying to send SIGINT and you find signal() doesn't work, try writing '\x03' to the exec/shell stream instead.
 
 
 SFTP events
@@ -463,6 +493,8 @@ SFTP methods
 
     * chunkSize - _integer_ - Size of each read in bytes (default: 32768)
 
+    * step - _function_(< _integer_ >total_transferred, < _integer_ >chunk, < _integer_ >total) - Called every time a part of a file was transferred
+
     `callback` has 1 parameter: < _Error_ >err.
 
 * **fastPut**(< _string_ >localPath, < _string_ >remotePath[, < _object_ >options], < _function_ >callback) - _(void)_ - Uploads a file from `localPath` to `remotePath` using parallel reads for faster throughput. `options` has the following defaults:
@@ -470,6 +502,8 @@ SFTP methods
     * concurrency - _integer_ - Number of concurrent reads (default: 25)
 
     * chunkSize - _integer_ - Size of each read in bytes (default: 32768)
+
+    * step - _function_(< _integer_ >total_transferred, < _integer_ >chunk, < _integer_ >total) - Called every time a part of a file was transferred
 
     `callback` has 1 parameter: < _Error_ >err.
 
